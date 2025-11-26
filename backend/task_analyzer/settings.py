@@ -82,13 +82,14 @@ if cors_origins:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',')]
 else:
     CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
+    "https://singularium-task-analyzer.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 
 # Allow all origins in development only
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
