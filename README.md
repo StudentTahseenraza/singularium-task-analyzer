@@ -34,55 +34,49 @@ A intelligent task management system that scores and prioritizes tasks based on 
 ### Backend Setup
 
 1. **Clone the repository**
-```bash
+   ```bash
    git clone <your-repository-url>
    cd singularium-task-analyzer
    
-2.Set up the backend
-  cd backend
- # Create virtual environment
- python -m venv venv
+2. **Set up the backend**
+   ```bash
+   cd backend
+   # Create virtual environment
+   python -m venv venv
 
- # Activate virtual environment
- # Windows:
- venv\Scripts\activate
- # Mac/Linux:
- source venv/bin/activate
-    # Install dependencies
-    pip install -r requirements.txt
-    # Run migrations
-    python manage.py migrate
-    # Start development server
-    python manage.py runserver
+   # Activate virtual environment
+   # Windows:
+   venv\Scripts\activate
+   # Mac/Linux:
+   source venv/bin/activate
+   # Install dependencies
+   pip install -r requirements.txt
+   # Run migrations
+   python manage.py migrate
+   # Start development server
+   python manage.py runserve
 
 Backend will be available at http://127.0.0.1:8000
 
 Frontend Setup
-
 Open a new terminal and navigate to frontend
 cd frontend
+**Start a local server**
+   ```
+   # Using Python (recommended)
+   python -m http.server 3000
+   # Or using Node.js
+   npx http-server
+   # Or using VS Code Live Server extension
+   # Right-click index.html -> "Open with Live Server"
+   GET /api/tasks/suggest/
+   Get top 3 task recommendations.
 
-Start a local server
+   Query Parameters:
 
-   ```bash
-# Using Python (recommended)
-python -m http.server 3000
+   tasks: JSON string of tasks array
 
-# Or using Node.js
-npx http-server
-
-# Or using VS Code Live Server extension
-# Right-click index.html -> "Open with Live Server"
-
-
-GET /api/tasks/suggest/
-Get top 3 task recommendations.
-
-Query Parameters:
-
-tasks: JSON string of tasks array
-
-strategy: Sorting strategy (default: smart_balance)
+   strategy: Sorting strategy (default: smart_balance)
 
 🧠 Algorithm Explanation
 The priority scoring algorithm uses a weighted approach with four key factors:
@@ -195,3 +189,4 @@ Machine Learning: Adaptive scoring based on user feedback
 Real-time Updates: WebSocket support for collaborative features
 
 Export Features: PDF reports, calendar integration
+
