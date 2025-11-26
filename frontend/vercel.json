@@ -4,17 +4,14 @@
     {
       "src": "*.html",
       "use": "@vercel/static"
-    }
-  ],
-  "routes": [
+    },
     {
-      "src": "/(.*)",
-      "dest": "/index.html",
-      "headers": {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY", 
-        "X-XSS-Protection": "1; mode=block"
-      }
+      "src": "*.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.js",
+      "use": "@vercel/static"
     }
   ]
 }
