@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 
     # Replace 'taskapp' with 'tasks' if your app folder is actually named `tasks`.
     # Earlier you were advised to use `taskapp` because `tasks` conflicts with a stdlib module.
-    'taskapp',
+    'tasks',
 ]
 
 MIDDLEWARE = [
