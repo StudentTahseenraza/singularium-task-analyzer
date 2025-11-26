@@ -1,6 +1,6 @@
-// API Configuration
-const API_BASE_URL = 'http://127.0.0.1:8000/api/tasks';
 
+// API Configuration - Use your actual Render backend URL
+const API_BASE_URL = 'https://singularium-task-analyzer.onrender.com/api/tasks';
 // Global state
 let tasks = [];
 let nextTaskId = 1;
