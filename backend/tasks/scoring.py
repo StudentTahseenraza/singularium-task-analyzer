@@ -119,12 +119,18 @@ def calculate_dependency_score(task: Dict, all_tasks: List[Dict]) -> float:
     """
     Calculate dependency score - tasks that block others get higher priority.
     """
-    task_id = task.get('id', all_tasks.index(task))
+    task_id = task.get('id')
+    
+    # If no ID, can't calculate dependencies
+    if task_id is None:
+        return 0.1
     
     # Count how many other tasks depend on this task
     blocking_count = 0
     for other_task in all_tasks:
-        if task_id in other_task.get('dependencies', []):
+        # Get dependencies list safely
+        dependencies = other_task.get('dependencies', [])
+        if task_id in dependencies:
             blocking_count += 1
     
     # Normalize: 0 dependencies = 0.1, 3+ dependencies = 1.0
@@ -255,31 +261,46 @@ def analyze_and_sort_tasks(tasks: List[Dict], strategy: str = "smart_balance") -
     for i, task in enumerate(tasks):
         # Ensure each task has an ID for dependency tracking
         if 'id' not in task:
-            task['id'] = i
-            warnings.append(f"Task '{task.get('title', 'Unknown')}' assigned automatic ID {i}")
+            task['id'] = i + 1  # Use 1-based indexing to avoid confusion with 0
+            warnings.append(f"Task '{task.get('title', 'Unknown')}' assigned automatic ID {i + 1}")
         
-        # Validate required fields
+        # Validate required fields with better error handling
         if not task.get('title'):
             errors.append(f"Task at index {i} is missing a title")
             continue
         
-        if task.get('estimated_hours', 0) <= 0:
-            warnings.append(f"Task '{task.get('title')}' has invalid estimated hours, using default")
+        # Validate and fix estimated_hours
+        estimated_hours = task.get('estimated_hours')
+        if estimated_hours is None or estimated_hours <= 0:
+            warnings.append(f"Task '{task.get('title')}' has invalid estimated hours, using default 1")
             task['estimated_hours'] = 1
         
-        if not (1 <= task.get('importance', 5) <= 10):
-            warnings.append(f"Task '{task.get('title')}' has invalid importance, using default")
+        # Validate and fix importance
+        importance = task.get('importance')
+        if importance is None or not (1 <= importance <= 10):
+            warnings.append(f"Task '{task.get('title')}' has invalid importance, using default 5")
             task['importance'] = 5
         
+        # Ensure dependencies is a list
+        if 'dependencies' not in task:
+            task['dependencies'] = []
+        elif not isinstance(task['dependencies'], list):
+            warnings.append(f"Task '{task.get('title')}' has invalid dependencies format, using empty list")
+            task['dependencies'] = []
+        
         # Calculate priority score
-        score_result = calculate_priority_score(task, tasks, strategy)
-        scored_task = {
-            **task,
-            'priority_score': score_result['total_score'],
-            'score_breakdown': score_result['score_breakdown'],
-            'explanation': score_result['explanation']
-        }
-        scored_tasks.append(scored_task)
+        try:
+            score_result = calculate_priority_score(task, tasks, strategy)
+            scored_task = {
+                **task,
+                'priority_score': score_result['total_score'],
+                'score_breakdown': score_result['score_breakdown'],
+                'explanation': score_result['explanation']
+            }
+            scored_tasks.append(scored_task)
+        except Exception as e:
+            errors.append(f"Error calculating score for task '{task.get('title')}': {str(e)}")
+            continue
     
     # Sort by priority score (descending)
     sorted_tasks = sorted(scored_tasks, key=lambda x: x['priority_score'], reverse=True)

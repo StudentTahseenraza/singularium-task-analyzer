@@ -44,6 +44,11 @@ def analyze_tasks(request):
             'message': 'Invalid JSON data'
         }, status=400)
     except Exception as e:
+        # Log the actual error for debugging
+        import traceback
+        print("Server error:", str(e))
+        print("Traceback:", traceback.format_exc())
+        
         return JsonResponse({
             'status': 'error',
             'message': f'Server error: {str(e)}'
