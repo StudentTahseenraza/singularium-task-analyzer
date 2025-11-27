@@ -1,6 +1,6 @@
-
 // API Configuration - Use your actual Render backend URL
 const API_BASE_URL = 'https://singularium-task-analyzer.onrender.com/api/tasks';
+
 // Global state
 let tasks = [];
 let nextTaskId = 1;
@@ -52,6 +52,13 @@ function handleAddTask(e) {
         return;
     }
     
+    // Check for duplicate titles
+    const duplicateTask = tasks.find(task => task.title.toLowerCase() === title.toLowerCase());
+    if (duplicateTask) {
+        showError('A task with this title already exists');
+        return;
+    }
+    
     if (!estimatedHours || estimatedHours <= 0) {
         showError('Estimated hours must be greater than 0');
         return;
@@ -67,7 +74,7 @@ function handleAddTask(e) {
     if (dependencies) {
         dependencyList = dependencies.split(',')
             .map(id => parseInt(id.trim()))
-            .filter(id => !isNaN(id));
+            .filter(id => !isNaN(id) && id > 0);
     }
     
     // Create task object
@@ -103,22 +110,41 @@ function handleBulkLoad() {
             return;
         }
         
-        // Validate and add tasks
+        let loadedCount = 0;
+        const duplicateTitles = [];
+        
+        // Validate and add tasks with duplicate checking
         parsedTasks.forEach(task => {
+            const title = task.title || 'Untitled Task';
+            
+            // Check for duplicates
+            const duplicateTask = tasks.find(t => t.title.toLowerCase() === title.toLowerCase());
+            if (duplicateTask) {
+                duplicateTitles.push(title);
+                return; // Skip this task
+            }
+            
             const newTask = {
                 id: nextTaskId++,
-                title: task.title || 'Untitled Task',
+                title: title,
                 due_date: task.due_date || null,
                 estimated_hours: task.estimated_hours || 1,
                 importance: task.importance || 5,
                 dependencies: task.dependencies || []
             };
             tasks.push(newTask);
+            loadedCount++;
         });
         
         saveTasksToStorage();
         updateTaskListDisplay();
-        showSuccess(`Successfully loaded ${parsedTasks.length} tasks from JSON!`);
+        
+        let message = `Successfully loaded ${loadedCount} tasks from JSON!`;
+        if (duplicateTitles.length > 0) {
+            message += ` Skipped ${duplicateTitles.length} duplicates.`;
+        }
+        
+        showSuccess(message);
         bulkInput.value = '';
         
     } catch (error) {
@@ -225,6 +251,8 @@ async function handleAnalyze() {
     resultsList.innerHTML = '';
     
     try {
+        console.log('Sending tasks to backend:', tasks.length, 'tasks');
+        
         const response = await fetch(`${API_BASE_URL}/analyze/`, {
             method: 'POST',
             headers: {
@@ -237,12 +265,19 @@ async function handleAnalyze() {
         });
         
         const data = await response.json();
+        console.log('Backend response:', data);
         
         if (!response.ok) {
-            throw new Error(data.message || 'Analysis failed');
+            // Show backend validation errors
+            if (data.errors && data.errors.length > 0) {
+                throw new Error(`Validation errors: ${data.errors.join(', ')}`);
+            } else {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            }
         }
         
         if (data.status === 'success') {
+            console.log('Received tasks from backend:', data.data.sorted_tasks.length, 'tasks');
             displayResults(data.data);
         } else {
             throw new Error(data.message || 'Unknown error occurred');
@@ -257,8 +292,29 @@ async function handleAnalyze() {
 }
 
 function displayResults(data) {
+    console.log('Displaying results for', data.sorted_tasks.length, 'tasks');
+    
+    // Clear previous results
+    suggestionsList.innerHTML = '';
+    resultsList.innerHTML = '';
+    
+    // Remove duplicates from backend response (safety check)
+    const uniqueTasks = [];
+    const seenTitles = new Set();
+    
+    data.sorted_tasks.forEach(task => {
+        if (!seenTitles.has(task.title)) {
+            seenTitles.add(task.title);
+            uniqueTasks.push(task);
+        } else {
+            console.warn('Duplicate task from backend:', task.title);
+        }
+    });
+    
+    console.log('Displaying', uniqueTasks.length, 'unique tasks after deduplication');
+    
     // Display top suggestions
-    const topTasks = data.sorted_tasks.slice(0, 3);
+    const topTasks = uniqueTasks.slice(0, 3);
     suggestionsList.innerHTML = topTasks.map((task, index) => `
         <div class="suggestion-item rank-${index + 1}">
             <div class="suggestion-rank">#${index + 1}</div>
@@ -274,7 +330,7 @@ function displayResults(data) {
     `).join('');
     
     // Display full analysis results
-    resultsList.innerHTML = data.sorted_tasks.map(task => {
+    resultsList.innerHTML = uniqueTasks.map(task => {
         const priorityClass = getPriorityClass(task.priority_score);
         return `
             <div class="result-item">
@@ -338,14 +394,35 @@ function loadTasksFromStorage() {
     
     if (savedTasks) {
         tasks = JSON.parse(savedTasks);
+        
+        // Remove duplicates from storage (safety check)
+        const uniqueTasks = [];
+        const seenTitles = new Set();
+        
+        tasks.forEach(task => {
+            if (!seenTitles.has(task.title)) {
+                seenTitles.add(task.title);
+                uniqueTasks.push(task);
+            }
+        });
+        
+        if (uniqueTasks.length !== tasks.length) {
+            console.log('Removed duplicates from storage:', tasks.length - uniqueTasks.length, 'duplicates');
+            tasks = uniqueTasks;
+            saveTasksToStorage();
+        }
     }
     
     if (savedNextId) {
         nextTaskId = parseInt(savedNextId);
+    } else {
+        // Find the highest ID and set nextTaskId appropriately
+        const maxId = tasks.reduce((max, task) => Math.max(max, task.id || 0), 0);
+        nextTaskId = maxId + 1;
     }
 }
 
-// Sample Data Loader (for testing)
+// Sample Data Loader (for testing) - FIXED: No circular dependencies
 function loadSampleData() {
     const sampleData = [
         {
@@ -353,14 +430,14 @@ function loadSampleData() {
             "due_date": "2025-11-28",
             "estimated_hours": 4,
             "importance": 9,
-            "dependencies": [2, 3]
+            "dependencies": []  // REMOVED: [2, 3] - was causing circular dependencies
         },
         {
             "title": "Write API documentation",
             "due_date": "2025-12-05",
             "estimated_hours": 6,
             "importance": 7,
-            "dependencies": [1]
+            "dependencies": []  // REMOVED: [1] - was causing circular dependencies
         },
         {
             "title": "Update CSS styling",
@@ -382,7 +459,7 @@ function loadSampleData() {
     showSuccess('Sample data loaded into JSON field. Click "Load Tasks from JSON" to add them.');
 }
 
-// Add sample data button for testing (optional)
+// Add sample data button for testing
 document.addEventListener('DOMContentLoaded', function() {
     const sampleBtn = document.createElement('button');
     sampleBtn.textContent = 'Load Sample Data';
@@ -391,4 +468,37 @@ document.addEventListener('DOMContentLoaded', function() {
     sampleBtn.onclick = loadSampleData;
     
     document.querySelector('.bulk-input h3').appendChild(sampleBtn);
+});
+
+// Remove duplicates function for manual cleanup
+function removeDuplicateTasks() {
+    const uniqueTasks = [];
+    const seenTitles = new Set();
+    
+    tasks.forEach(task => {
+        if (!seenTitles.has(task.title)) {
+            seenTitles.add(task.title);
+            uniqueTasks.push(task);
+        }
+    });
+    
+    if (uniqueTasks.length !== tasks.length) {
+        const removedCount = tasks.length - uniqueTasks.length;
+        tasks = uniqueTasks;
+        saveTasksToStorage();
+        updateTaskListDisplay();
+        showSuccess(`Removed ${removedCount} duplicate tasks`);
+    } else {
+        showSuccess('No duplicate tasks found');
+    }
+}
+
+// Add duplicate removal button
+document.addEventListener('DOMContentLoaded', function() {
+    const duplicateBtn = document.createElement('button');
+    duplicateBtn.textContent = 'Remove Duplicates';
+    duplicateBtn.className = 'btn btn-warning';
+    duplicateBtn.onclick = removeDuplicateTasks;
+    duplicateBtn.style.marginLeft = '10px';
+    document.querySelector('.strategy-section').appendChild(duplicateBtn);
 });
